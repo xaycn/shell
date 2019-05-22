@@ -31,10 +31,6 @@ is_exec() {
     fi
 }
 
-install_exec() {
-
-}
-
 get_opsy() {
     [ -f /etc/redhat-release ] && awk '{print ($1,$3~/^[0-9]/?$3:$4)}' /etc/redhat-release && return
     [ -f /etc/os-release ] && awk -F'[= "]' '/PRETTY_NAME/{print $3,$4,$5}' /etc/os-release && return
@@ -101,7 +97,17 @@ sysinfo() {
 }
 
 menu() {
-    echo ---
+    echo
+    echo -e "\t\t\t test menu"
+    echo -e "\t1. Display disk space"
+    echo -e "\t2. Display logged on users" 
+    echo -e "\t3. Display memory usage" 
+    echo -e "\t0. Exit menu\n\n"
+
+    #-en 选项会去掉末尾的换行符，这让菜单看起来更专业一些
+    echo -en "\t\tEnter option:" 
+    #read 命令读取用户输入
+    read -n 1 option
 }
 
 clear
