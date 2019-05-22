@@ -15,7 +15,7 @@ BLUE='\033[0;36m'
 PLAIN='\033[0m'
 
 #
-version='1.0.0'
+ver='1.0.0'
 update_time='2019-5-22'
 usage='wget -qO- git.io/superbench.sh | bash'
 
@@ -38,9 +38,24 @@ get_opsy() {
 }
 
 init() {
-    echo -e ' Version : ${RED}${usage}${PLAIN} Time : ${GREEN}${update_time}${PLAIN}'
-    echo -e ' Usuage  : ${YELLOW}${usage}${PLAIN}'
+    echo -e " Version : ${RED}${ver}${PLAIN} Time : ${GREEN}${update_time}${PLAIN}"
+    echo -e " Usuage  : ${YELLOW}${usage}${PLAIN}"
     get_info
+}
+
+calc_disk() {
+    local total_size=0
+    local array=$@
+    for size in ${array[@]}
+    do
+        [ "${size}" == "0" ] && size_t=0 || size_t=`echo ${size:0:${#size}-1}`
+        [ "`echo ${size:(-1)}`" == "K" ] && size=0
+        [ "`echo ${size:(-1)}`" == "M" ] && size=$( awk 'BEGIN{printf "%.1f", '$size_t' / 1024}' )
+        [ "`echo ${size:(-1)}`" == "T" ] && size=$( awk 'BEGIN{printf "%.1f", '$size_t' * 1024}' )
+        [ "`echo ${size:(-1)}`" == "G" ] && size=${size_t}
+        total_size=$( awk 'BEGIN{printf "%.1f", '$total_size' + '$size'}' )
+    done
+    echo ${total_size}
 }
 
 get_info() {
@@ -97,17 +112,7 @@ sysinfo() {
 }
 
 menu() {
-    echo
-    echo -e "\t\t\t test menu"
-    echo -e "\t1. Display disk space"
-    echo -e "\t2. Display logged on users" 
-    echo -e "\t3. Display memory usage" 
-    echo -e "\t0. Exit menu\n\n"
-
-    #-en 选项会去掉末尾的换行符，这让菜单看起来更专业一些
-    echo -en "\t\tEnter option:" 
-    #read 命令读取用户输入
-    read -n 1 option
+    echo '--'
 }
 
 clear
