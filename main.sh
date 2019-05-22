@@ -38,8 +38,9 @@ get_opsy() {
 }
 
 init() {
-    echo -e " Version : ${RED}${ver}${PLAIN} Time : ${GREEN}${update_time}${PLAIN}"
-    echo -e " Usuage  : ${YELLOW}${usage}${PLAIN}"
+    echo -e "/tVersion       : ${RED}${ver}${PLAIN} Time : ${GREEN}${update_time}${PLAIN}"
+    echo -e "/tUpdate Time   : ${GREEN}${update_time}${PLAIN}"
+    echo -e "/tUsuage        : ${YELLOW}${usage}${PLAIN}"
     get_info
 }
 
@@ -89,26 +90,26 @@ get_info() {
 }
 
 ipinfo() {
-    echo -e "IPv4            : ${BLUE}$ipipv4${PLAIN}"
-    echo -e "IPv6            : ${BLUE}$ipipv6${PLAIN}"
-    echo -e "Organization    : ${BLUE}$iporg${PLAIN}"
-    echo -e "Location        : ${BLUE}$ipcountry, ipprovince, ipcity /${PLAIN}"
+    echo -e " IPv4                 : ${BLUE}$ipipv4${PLAIN}"
+    echo -e " IPv6                 : ${BLUE}$ipipv6${PLAIN}"
+    echo -e " Organization         : ${BLUE}$iporg${PLAIN}"
+    echo -e " Location             : ${BLUE}$ipcountry, ipprovince, ipcity /${PLAIN}"
 }
 
 sysinfo() {
-    echo -e "CPU model            : ${BLUE}$cname${PLAIN}"
-    echo -e "Number of cores      : ${BLUE}$cores${PLAIN}"
-    echo -e "CPU frequency        : ${BLUE}$freq MHz${PLAIN}"
-    echo -e "CPU Cache            : ${SKYBLUE}$corescache ${PLAIN}"
-    echo -e "Total Disk           : ${BLUE}$disk_total_size GB ($disk_used_size GB Used)${PLAIN}"
-    echo -e "Total Memory         : ${BLUE}$tram MB ($uram MB Used)${PLAIN}"
-    echo -e "Total Swap           : ${BLUE}$swap MB ($uswap MB Used)${PLAIN}"
-    echo -e "Load average         : ${BLUE}$load${PLAIN}"
-    echo -e "OS                   : ${BLUE}$opsy${PLAIN}"
-    echo -e "Arch                 : ${BLUE}$arch ($lbit Bit)${PLAIN}"
-    echo -e "Kernel               : ${BLUE}$kern${PLAIN}"
-    echo -e "Virt-what            : ${BLUE}$kern${PLAIN}"
-    echo -e "System uptime        : ${BLUE}$up${PLAIN}"
+    echo -e " CPU model            : ${BLUE}$cname${PLAIN}"
+    echo -e " Number of cores      : ${BLUE}$cores${PLAIN}"
+    echo -e " CPU frequency        : ${BLUE}$freq MHz${PLAIN}"
+    echo -e " CPU Cache            : ${SKYBLUE}$corescache ${PLAIN}"
+    echo -e " Total Disk           : ${BLUE}$disk_total_size GB ($disk_used_size GB Used)${PLAIN}"
+    echo -e " Total Memory         : ${BLUE}$tram MB ($uram MB Used)${PLAIN}"
+    echo -e " Total Swap           : ${BLUE}$swap MB ($uswap MB Used)${PLAIN}"
+    echo -e " Load average         : ${BLUE}$load${PLAIN}"
+    echo -e " OS                   : ${BLUE}$opsy${PLAIN}"
+    echo -e " Arch                 : ${BLUE}$arch ($lbit Bit)${PLAIN}"
+    echo -e " Kernel               : ${BLUE}$kern${PLAIN}"
+    echo -e " Virt-what            : ${BLUE}$kern${PLAIN}"
+    echo -e " System uptime        : ${BLUE}$up${PLAIN}"
 }
 
 menu() {
