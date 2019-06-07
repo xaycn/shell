@@ -18,7 +18,9 @@ BLUE='\033[0;36m'
 PLAIN='\033[0m'
 
 log="$HOME/xaycn.system.log"
-log_up="$HOME/xaycn.system.log"
+log_up="$HOME/xaycn.system_upload.log"
+true > $log
+
 
 note() {
     local t
@@ -40,7 +42,7 @@ finish() {
 	fi
     
     cat $log 2>&1 | sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g" > $log_up
-    share_link=$( curl -v --data-urlencode "content@$log_up" -d "poster=xaycn.systest" -d "syntax=text" "https://paste.ubuntu.com" 2>&1 | \
+    share_link=$( curl -v --data-urlencode "content@$log_up" -d "poster=xaycn.system" -d "syntax=text" "https://paste.ubuntu.com" 2>&1 | \
 			grep "Location" | awk '{print $3}' )
     echo
     echo " Results      : ${log}"
@@ -392,10 +394,10 @@ net_info() {
 clear
 init
 clear
-ip_info 2>/dev/null | tee $log
-os_info 2>/dev/null | tee $log
-cpu_info 2>/dev/null | tee $log
-mem_info 2>/dev/null | tee $log
-disk_info 2>/dev/null | tee $log
-net_info 2>/dev/null | tee $log
+ip_info 2>/dev/null | tee -a $log
+os_info 2>/dev/null | tee -a $log
+cpu_info 2>/dev/null | tee -a $log
+mem_info 2>/dev/null | tee -a $log
+disk_info 2>/dev/null | tee -a $log
+net_info 2>/dev/null | tee -a $log
 finish
