@@ -17,8 +17,8 @@ PUR='\033[0;35m'
 BLUE='\033[0;36m'
 PLAIN='\033[0m'
 
-log="$HOME/xaycn.systest.log"
-log_up="$HOME/xaycn.systest_upload.log"
+log="$HOME/xaycn.system.log"
+log_up="$HOME/xaycn.system.log"
 
 note() {
     local t
@@ -350,7 +350,7 @@ net_info() {
     note "netinfo"
     
     printf " %-7s%-25s%-15s%-14s%-10s\n" "Area" "Node Name" "Download" "Speed" "Ping"
-    speed 'http://cachefly.cachefly.net/100mb.test' ' ' 'Speedtest'
+    speed 'http://cachefly.cachefly.net/100mb.test' 'Speedtest' '-'
     echo
     speed 'http://tx-us-ping.vultr.com/vultr.com.100MB.bin' 'Vultr, Dallas' 'USA'
     speed 'https://lax-ca-us-ping.vultr.com/vultr.com.100MB.bin' 'Vultr, Los Angeles' 'USA'
@@ -400,4 +400,3 @@ mem_info 2>/dev/null | tee $log
 disk_info 2>/dev/null | tee $log
 net_info 2>/dev/null | tee $log
 finish
-
