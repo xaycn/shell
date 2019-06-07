@@ -31,7 +31,7 @@ note() {
 
 finish() {
     note
-    rm -f test_$$
+    rm -f test_*
 	end=$(date +%s) 
 	time=$(( $end - $start ))
 	if [[ $time -gt 60 ]]; then
