@@ -1,0 +1,403 @@
+#!/usr/bin/env bash
+#
+# A powerful script to meet your needs.
+#
+# Copyright (C) By Xaycn <Xaycn@outlook.com>
+#
+# Github: https://github.com/Xaycn
+#
+
+start=$( date +%s )
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+PURPLE='\033[0;34m'
+PUR='\033[0;35m'
+BLUE='\033[0;36m'
+PLAIN='\033[0m'
+
+log="$HOME/xaycn.systest.log"
+log_up="$HOME/xaycn.systest_upload.log"
+
+note() {
+    local t
+    printf "%-30s" "-" | sed 's/\s/-/g'
+    [ -n "$1" ] && t="[${1}]"
+    printf "%-40s\n" ${t} | sed 's/\s/-/g'
+}
+
+finish() {
+    note
+	end=$(date +%s) 
+	time=$(( $end - $start ))
+	if [[ $time -gt 60 ]]; then
+		min=$(expr $time / 60)
+		sec=$(expr $time % 60)
+		echo -e " Finished in  : ${min} min ${sec} sec"
+	else
+		echo -e " Finished in  : ${time} sec"
+	fi
+    
+    cat $log 2>&1 | sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g" > $log_up
+    share_link=$( curl -v --data-urlencode "content@$log_up" -d "poster=xaycn.systest" -d "syntax=text" "https://paste.ubuntu.com" 2>&1 | \
+			grep "Location" | awk '{print $3}' )
+    echo
+    echo " Results      : ${log}"
+	echo " Shares       : ${share_link}"
+    rm -f $log_up
+    exit
+}
+
+trap finish SIGINT
+
+pkg_exists() {
+    command -v $1 >/dev/null 2>&1
+}
+
+pkg_install() {
+    message info "Installing $1"
+    if ${os} install -y $1 > /dev/null 2>&1; then
+        message success "$1 installation Completed"
+    else
+        message error "$1 installation Failed"
+    fi
+}
+
+
+get_opsy() {
+    [ -f /etc/redhat-release ] && awk '{print ($1,$3~/^[0-9]/?$3:$4)}' /etc/redhat-release && return
+    [ -f /etc/os-release ] && awk -F'[= "]' '/PRETTY_NAME/{print $3,$4,$5}' /etc/os-release && return
+    [ -f /etc/lsb-release ] && awk -F'[="]+' '/DESCRIPTION/{print $2}' /etc/lsb-release && return
+}
+
+message() {
+    if [ "$1" = 'success' ]; then
+        echo -e "[${GREEN}success${PLAIN}] $2"
+    elif [ "$1" = 'error' ]; then
+        echo -e "[${RED}error${PLAIN}] $2"
+    elif [ -n "$1" ] && [ -z "$2" ]; then
+        echo -e $1
+    else
+        echo -e "[${YELLOW}$1${PLAIN}] $2"
+    fi
+}
+
+get_json() {
+    echo $1 | grep -Po "(?<=\"${2}\":).*?(?=\",|,\"|})" | grep -Po "[^\"]+"
+}
+
+init() {
+    get_opsy | grep -Eqi 'ubuntu|debian' && os='apt-get'
+    get_opsy | grep -Eqi 'centos|red hat|redhat' && os='yum'
+    
+    pkg_exists curl || pkg_install curl
+    pkg_exists wget || pkg_install wget
+    pkg_exists virt-what || pkg_install virt-what
+    
+}
+
+averageio() {
+	ioraw1=$( echo $1 | awk 'NR==1 {print $1}' )
+		[ "$(echo $1 | awk 'NR==1 {print $2}')" == "GB/s" ] && ioraw1=$( awk 'BEGIN{print '$ioraw1' * 1024}' )
+	ioraw2=$( echo $2 | awk 'NR==1 {print $1}' )
+		[ "$(echo $2 | awk 'NR==1 {print $2}')" == "GB/s" ] && ioraw2=$( awk 'BEGIN{print '$ioraw2' * 1024}' )
+	ioraw3=$( echo $3 | awk 'NR==1 {print $1}' )
+		[ "$(echo $3 | awk 'NR==1 {print $2}')" == "GB/s" ] && ioraw3=$( awk 'BEGIN{print '$ioraw3' * 1024}' )
+	ioall=$( awk 'BEGIN{print '$ioraw1' + '$ioraw2' + '$ioraw3'}' )
+	ioavg=$( awk 'BEGIN{printf "%.1f", '$ioall' / 3}' )
+	printf "%s" "$ioavg"
+}
+
+freedisk() {
+	freespace=$( df -m . | awk 'NR==2 {print $4}' )
+	if [[ $freespace == "" ]]; then
+		$freespace=$( df -m . | awk 'NR==3 {print $3}' )
+	fi
+	if [[ $freespace -gt 1024 ]]; then
+		printf "%s" $((1024*2))
+	elif [[ $freespace -gt 512 ]]; then
+		printf "%s" $((512*2))
+	elif [[ $freespace -gt 256 ]]; then
+		printf "%s" $((256*2))
+	elif [[ $freespace -gt 128 ]]; then
+		printf "%s" $((128*2))
+	else
+		printf "1"
+	fi
+}
+
+ping_test() {
+	# ping one time
+	local ping_link=$( echo ${1#*//} | cut -d"/" -f1 )
+	local ping_ms=$( ping -w1 -c1 $ping_link | grep 'rtt' | cut -d"/" -f5 )
+
+	# get download speed and print
+	if [[ $ping_ms == "" ]]; then
+		printf " - "
+	else
+		printf "%3i.%s ms" "${ping_ms%.*}" "${ping_ms#*.}"
+	fi
+}
+
+speed() {
+    local area=$3
+    local nodename=$2
+    
+	local C_DL=$( curl -m 4 -w '%{speed_download}\n' -o /dev/null -s "$1" )
+	local bytes=${C_DL%.*}
+	local Mbps=$( printf "%s" "$bytes" | awk '{ printf "%.2f", $0 / 1024 / 1024 * 8 } END { if (NR == 0) { print "error" } }' )
+	if [[ $bytes -lt 1000 ]]; then
+        local download=$( printf "%i B/s" "$bytes" )
+        local netspeed=$( printf "N/A" )
+	elif [[ $bytes -lt 1000000 ]]; then
+		local KiBs=$( printf "%s" "$bytes" | awk '{ printf "%.2f", $0 / 1024 } END { if (NR == 0) { print "error" } }' )
+        local download=$( printf "%s KB/s" "$KiBs" )
+        local netspeed=$( printf "%s Mbps" "$Mbps" )
+	else
+		# awk way for accuracy
+		local MBs=$( printf "%s" "$bytes" | awk '{ printf "%.2f", $0 / 1024 / 1024 } END { if (NR == 0) { print "error" } }' )
+        local download=$( printf "%s MB/s" "$MBs" )
+        local netspeed=$( printf "%s Mbps" "$Mbps" )
+	fi
+    
+    local ping=$( ping_test $1 )
+
+    printf " ${BLUE}%-6s${YELLOW}%-25s${GREEN}%-14s${RED}%-14s${BLUE}%-11s${PLAIN}\n" "${area}" " ${nodename}" "${download}" "${netspeed}" "${ping}"
+}
+
+pingto() {
+
+    local name1=$2
+    local ping1=$( ping_test $1 )
+    local name2=$4
+    local ping2=$( ping_test $3 )
+
+    printf " ${YELLOW}%-23s${BLUE}%-11s${GREEN}%-2s${YELLOW}%-22s${BLUE}%-11s${PLAIN}\n" "${name1}" " ${ping1}" " | " "${name2}" "${ping2}"
+}
+
+ip_info() {
+    note "ipinfo"
+    json1=$( curl -sS --connect-timeout 3 -m 60 api.ip.la/json )
+    json2=$( curl -sS --connect-timeout 3 -m 60 ip-api.com/json )
+    json3=$( curl -sS --connect-timeout 3 -m 60 ipinfo.io/json )
+    ipv6=$( curl -s ipv6.icanhazip.com )
+
+    #json1
+    ipv4=$( get_json "$json1" "ip" )
+    ipcountry=$( get_json "$json1" "country_name" )
+    ipregion=$( get_json "$json1" "region_name" )
+    ipcity=$( get_json "$json1" "city_name" )
+    ipispdomain=$( get_json "$json1" "isp_domain" )
+
+    #json2
+    [ -z "$ipv4" ] && ipv4=$( get_json "$json2" "query" )
+    ipas=$( get_json "$json2" "as" )
+    ipisp=$( get_json "$json2" "isp" )
+    iporg=$( get_json "$json2" "org" )
+    [ -z "$ipcountry" ] && ipcountry=$( get_json "$json2" "country" )
+    [ -z "$ipregion" ] && ipregion=$( get_json "$json2" "regionName" )
+    [ -z "$ipcity" ] && ipcity=$( get_json "$json2" "city" )
+    
+    ipzip=$( get_json "$json2" "zip" )
+    
+    
+    #json3
+    [ -z "$ipv4" ] && ipv4=$( get_json "$json3" "ip" )
+    iphostname=$( get_json "$json3" "hostname" )
+    [ -z "$ipcountry" ] && ipcountry=$( get_json "$json3" "country" )
+    [ -z "$ipregion" ] && ipregion=$( get_json "$json3" "region" )
+    [ -z "$ipcity" ] && ipcity=$( get_json "$json3" "city" )
+    [ -z "$iporg" ] && iporg=$( get_json "$json3" "org" )
+    [ -z "$ipzip" ] && ipzip=$( get_json "$json3" "postal" )
+    
+    
+    #echo
+    [ -n "$ipv4" ] &&        echo -e " IPv4                 : ${PUR}$ipv4${PLAIN}"
+    [ -n "$ipv6" ] &&        echo -e " IPv6                 : ${PUR}$ipv6${PLAIN}"
+    [ -n "$ipcountry" ] &&   echo -e " Address              : ${PUR}${ipcountry} ${ipregion} ${ipcity}${PLAIN}"
+    [ -n "$ipisp" ] &&       echo -e " ISP                  : ${PUR}$ipisp${PLAIN}"
+    [ -n "$ipispdomain" ] && echo -e " ISP Domain           : ${PUR}$ipispdomain${PLAIN}"
+    [ -n "$ipas" ] &&        echo -e " ASN                  : ${PUR}$ipas${PLAIN}"
+    [ -n "$iporg" ] &&       echo -e " Organization         : ${PUR}$iporg${PLAIN}"
+    [ -n "$iphostname" ] &&  echo -e " iphostname           : ${PUR}$iphostname${PLAIN}"
+    [ -n "$ipzip" ] &&       echo -e " ZIP                  : ${PUR}$ipzip${PLAIN}"
+    
+}
+
+os_info() {
+    note "osinfo"
+    
+    osopsy=$( get_opsy )
+    ossys=$( uname -o )
+    oskern=$( uname -r )
+    oshostname=$( uname -n )
+    osarch=$( uname -m )
+    oslbit=$( getconf LONG_BIT )
+    osvirt=$( virt-what )
+    ostcpctrl=$( sysctl net.ipv4.tcp_congestion_control | awk -F ' ' '{print $3}' )
+    osuptime=$( awk '{a=$1/86400;b=($1%86400)/3600;c=($1%3600)/60} {printf("%d days, %d hour %d min\n",a,b,c)}' /proc/uptime )
+    ossmodel=$( dmidecode | grep "Product Name:"|sed -n '1p'|awk -F': ' '{print $2}' )
+    
+    echo -e " OS                   : ${BLUE}$ossys${PLAIN}"
+    echo -e " OS Release           : ${BLUE}$osopsy${PLAIN}"
+    echo -e " Kernel               : ${BLUE}$oskern${PLAIN}"
+    echo -e " Arch                 : ${BLUE}$osarch ($oslbit Bit)${PLAIN}"
+    echo -e " Hostname             : ${BLUE}$oshostname${PLAIN}"
+    echo -e " Virt What            : ${BLUE}$osvirt${PLAIN}"
+    echo -e " Server Model         : ${BLUE}$ossmodel${PLAIN}"
+    echo -e " TCP Control          : ${BLUE}$ostcpctrl${PLAIN}"
+    echo -e " System Uptime        : ${BLUE}$osuptime${PLAIN}"
+    
+}
+
+cpu_info() {
+    note "cpuinfo"
+
+    cpuname=$( cat /proc/cpuinfo | grep "model name" | uniq |awk -F': ' '{print $2}' )
+    cpucount=$( cat /proc/cpuinfo | grep "physical id" | sort -u| wc -l )
+    cpuctotal=$( cat /proc/cpuinfo | grep "cpu cores" | uniq |awk -F': ' '{print $2}' )
+    cpucores=$( cat /proc/cpuinfo | grep "core id" | sort -u | wc -l )
+    cpulogic=$( cat /proc/cpuinfo | grep "siblings" | sort -u | awk -F: '{print $2}' )
+    cpufreq=$( cat /proc/cpuinfo | grep "cpu MHz" | uniq |awk -F': ' '{print $2}' )
+    cpucache=$( cat /proc/cpuinfo| grep "cache size"|uniq|awk '{print $4,$5}' )
+    cpuload=$( w | head -1 | awk -F'load average:' '{print $2}' | sed 's/^[ \t]*//;s/[ \t]*$//' )
+    
+    echo -e " Model Name           : ${YELLOW}$cpuname${PLAIN}"
+    echo -e " Physical count       : ${YELLOW}$cpucount${PLAIN}"
+    echo -e " Total Cores          : ${YELLOW}$cpuctotal${PLAIN}"
+    if [ "$cpucores" eq "1" ]; then
+        echo -e " CPU Processor        : ${YELLOW}${cpucores} Core /${cpulogic} Processor ${PLAIN}"
+    else
+        echo -e " CPU Processor        : ${YELLOW}${cpucores} Cores /${cpulogic} Processors ${PLAIN}"
+    fi
+    echo -e " Frequency            : ${YELLOW}${cpufreq} MHz${PLAIN}"
+    echo -e " Cache size           : ${YELLOW}$cpucache${PLAIN}"
+    echo -e " Load average         : ${YELLOW}$cpuload${PLAIN}"
+    
+}
+
+mem_info() {
+    note "meminfo"
+    
+    tram=$( free -m | awk '/Mem/ {print $2}' )
+    uram=$( free -m | awk '/Mem/ {print $3}' )
+	fram=$( free -m | awk '/Mem/ {print $4}' )
+	bram=$( free -m | awk '/Mem/ {print $6}' )
+	swap=$( free -m | awk '/Swap/ {print $2}' )
+	fswap=$( free -m | awk '/Swap/ {print $4}' )
+    
+    echo -e " Total RAM            : ${GREEN}$tram MB (Free $fram MB)${PLAIN}"
+    echo -e " Used  RAM            : ${GREEN}$uram MB Used / $bram MB Buff(Cache)${PLAIN}"
+    echo -e " Total SWAP           : ${GREEN}$swap MB (Free $fswap MB)${PLAIN}"
+    
+	# RAM Speed test
+	# set ram allocation for mount
+	if [[ tram -gt 1900 ]]; then
+		sbram=1024M
+		sbcount=2048
+	else
+		sbram=$(( tram / 2 ))M
+		sbcount=$tram
+	fi
+    
+    if [[ $sbcount != "1" ]]; then
+    	iow1=$( (LANG=C dd if=/dev/zero of=test_$$ bs=512K count=$sbcount ) 2>&1 | awk -F, '{io=$NF} END { print io}' | sed 's/^[ \t]*//;s/[ \t]*$//' )
+        ior1=$( (LANG=C dd if=test_$$ of=/dev/null bs=512K count=$sbcount && rm -f test_$$ ) 2>&1 | awk -F, '{io=$NF} END { print io}' | sed 's/^[ \t]*//;s/[ \t]*$//' )
+        iow2=$( (LANG=C dd if=/dev/zero of=test_$$ bs=512K count=$sbcount ) 2>&1 | awk -F, '{io=$NF} END { print io}' | sed 's/^[ \t]*//;s/[ \t]*$//' )
+        ior2=$( (LANG=C dd if=test_$$ of=/dev/null bs=512K count=$sbcount && rm -f test_$$ ) 2>&1 | awk -F, '{io=$NF} END { print io}' | sed 's/^[ \t]*//;s/[ \t]*$//' )
+        iow3=$( (LANG=C dd if=/dev/zero of=test_$$ bs=512K count=$sbcount ) 2>&1 | awk -F, '{io=$NF} END { print io}' | sed 's/^[ \t]*//;s/[ \t]*$//' )
+        ior3=$( (LANG=C dd if=test_$$ of=/dev/null bs=512K count=$sbcount && rm -f test_$$ ) 2>&1 | awk -F, '{io=$NF} END { print io}' | sed 's/^[ \t]*//;s/[ \t]*$//' )
+        
+        echo
+        echo -e " RAM speed(1st run)   : ${GREEN}write $iow1 - read $ior1${PLAIN}"
+        echo -e " RAM speed(2nd run)   : ${GREEN}write $iow2 - read $ior2${PLAIN}"
+        echo -e " RAM speed(3rd run)   : ${GREEN}write $iow3 - read $ior3${PLAIN}"
+        echo -e " Average RAM speed    : ${GREEN}write $(averageio "$iow1" "$iow2" "$iow3") MB/s - read $(averageio "$ior1" "$ior2" "$ior3") MB/s${PLAIN}"
+    fi
+    
+}
+
+disk_info() {
+    note "diskinfo"
+    
+    hdd=$( df -h --total --local -x tmpfs | grep 'total' | awk '{print $2}' )B
+	hddfree=$( df -h --total | grep 'total' | awk '{print $5}' )
+    
+    echo -e " Total Disk           : ${PURPLE}$hdd ($hddfree used)${PLAIN}"
+
+	writemb=$(freedisk)
+	
+	writemb_size="$(( writemb / 2 ))MB"
+	if [[ $writemb_size == "1024MB" ]]; then
+		writemb_size="1.0GB"
+	fi
+
+	if [[ $writemb != "1" ]]; then
+
+        iowr1=$( (LANG=C dd if=/dev/zero of=test_$$ bs=512K count=$writemb conv=fdatasync oflag=direct && rm -f test_$$ ) 2>&1 | awk -F, '{io=$NF} END { print io}' | sed 's/^[ \t]*//;s/[ \t]*$//' )
+        iowr2=$( (LANG=C dd if=/dev/zero of=test_$$ bs=512K count=$writemb conv=fdatasync oflag=direct && rm -f test_$$ ) 2>&1 | awk -F, '{io=$NF} END { print io}' | sed 's/^[ \t]*//;s/[ \t]*$//' )
+        iowr3=$( (LANG=C dd if=/dev/zero of=test_$$ bs=512K count=$writemb conv=fdatasync oflag=direct && rm -f test_$$ ) 2>&1 | awk -F, '{io=$NF} END { print io}' | sed 's/^[ \t]*//;s/[ \t]*$//' )
+        echo
+        echo -e " I/O speed( $writemb_size )   : ${PURPLE}$iowr1${PLAIN}"
+        echo -e " I/O speed( $writemb_size )   : ${PURPLE}$iowr2${PLAIN}"
+        echo -e " I/O speed( $writemb_size )   : ${PURPLE}$iowr3${PLAIN}"
+        echo -e " Average I/O speed    : ${PURPLE}$(averageio "$iowr1" "$iowr2" "$iowr3") MB/s${PLAIN}"
+	fi
+}
+
+net_info() {
+    note "netinfo"
+    
+    printf " %-7s%-25s%-15s%-14s%-10s\n" "Area" "Node Name" "Download" "Speed" "Ping"
+    speed 'http://cachefly.cachefly.net/100mb.test' ' ' 'Speedtest'
+    echo
+    speed 'http://tx-us-ping.vultr.com/vultr.com.100MB.bin' 'Vultr, Dallas' 'USA'
+    speed 'https://lax-ca-us-ping.vultr.com/vultr.com.100MB.bin' 'Vultr, Los Angeles' 'USA'
+    speed 'http://wa-us-ping.vultr.com/vultr.com.100MB.bin' 'Vultr, Seattle' 'USA'
+    speed 'http://speedtest.wdc01.softlayer.com/downloads/test100.zip' 'Softlayer, Washington' 'USA'
+    speed 'http://speedtest.london.linode.com/100MB-london.bin' 'Linode, London' 'UK'
+    echo
+    speed 'http://speedtest.hkg02.softlayer.com/downloads/test100.zip' 'Softlayer, HongKong' 'CN'
+    speed 'http://bhs.proof.ovh.net/files/100Mio.dat' 'OVH, Beauharnois' 'CA'
+    speed 'http://speedtest.fremont.linode.com/100MB-fremont.bin' 'Linode, Fremont' 'CA'
+    speed 'http://hnd-jp-ping.vultr.com/vultr.com.100MB.bin' 'Vultr, Tokyo' 'JP'
+    speed 'http://speedtest.tokyo.linode.com/100MB-tokyo.bin' 'Linode, Tokyo' 'JP'
+    speed 'http://speedtest.singapore.linode.com/100MB-singapore.bin' 'Linode, Singapore' 'SG'
+    speed 'http://speedtest.sng01.softlayer.com/downloads/test100.zip' 'Softlayer, Singapore' 'SG'
+    echo
+    speed 'http://rbx.proof.ovh.net/files/100Mio.dat' 'OVH, Roubaix' 'FR'
+    speed 'http://speedtest.frankfurt.linode.com/100MB-frankfurt.bin' 'Linode, Frankfurt' 'DE'
+    speed 'http://speedtest.fra02.softlayer.com/downloads/test100.zip' 'Softlayer, Frankfurt' 'DE'
+    echo
+    # Hua bei
+    pingto '113.59.224.1' 'CTCC, Bei jing' '123.183.181.249' 'CTCC, He bei'
+    # Dong bei
+    pingto '36.104.148.42' 'CTCC, Chang chun' '123.246.129.254' 'CTCC, Shen yang'
+    # Xibei
+    pingto '202.100.178.13' 'CTCC, Xin jiang' '113.141.68.18' 'CTCC, Xi an'
+    # Xi nan
+    pingto '182.150.2.3' 'CTCC, Cheng du' '36.111.160.1' 'CTCC, Gui yang'
+    # Hua zhong
+    pingto '58.49.233.254' 'CTCC, Wu han' '36.111.200.2' 'CTCC, Chang sha'
+    # Hua dong
+    pingto '180.163.107.177' 'CTCC, Shang hai' '58.213.101.254'	'CTCC, Nan jing'
+    # Hua nan
+    pingto '183.2.167.74' 'CTCC, Guangzhou' '183.60.194.233' 'CTCC, Foshan'
+    
+    pingto '221.176.23.110' 'CMCC, Guang zhou' '120.80.120.50' 'CUCC, Guang zhou'
+    pingto '117.185.3.229' 'CMCC, Shang hai' '139.226.208.250' 'CUCC, Shang hai'
+    
+}
+
+clear
+init
+clear
+ip_info 2>/dev/null | tee $log
+os_info 2>/dev/null | tee $log
+cpu_info 2>/dev/null | tee $log
+mem_info 2>/dev/null | tee $log
+disk_info 2>/dev/null | tee $log
+net_info 2>/dev/null | tee $log
+finish
+
