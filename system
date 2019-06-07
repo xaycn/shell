@@ -351,7 +351,6 @@ net_info() {
     
     printf " %-7s%-25s%-15s%-14s%-10s\n" "Area" "Node Name" "Download" "Speed" "Ping"
     speed 'http://cachefly.cachefly.net/100mb.test' 'Speedtest' '-'
-    echo
     speed 'http://tx-us-ping.vultr.com/vultr.com.100MB.bin' 'Vultr, Dallas' 'USA'
     speed 'https://lax-ca-us-ping.vultr.com/vultr.com.100MB.bin' 'Vultr, Los Angeles' 'USA'
     speed 'http://wa-us-ping.vultr.com/vultr.com.100MB.bin' 'Vultr, Seattle' 'USA'
